@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.24.1/dist/phaser.min.js"></script>
+</head>
+<body>
+
+    <script>
+
+    const config = {
+        type: Phaser.AUTO,
+        width: 1024,
+        height: 510,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 200 }
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        },
+    };
+
+    const game = new Phaser.Game(config);
+
+    let player = {
+        x: 100,
+        y: 100,
+        rect: undefined,
+        graphics: undefined,
+        pdx: 0.0,
+        pdy: 0.0,
+        pa: 3 * Math.PI / 2,
+        directionLine: undefined,
+        directionGraphics: undefined,
+    };
+
+    let keyW;
+    let keyA;
+    let keyS;
+    let keyD;
+
+    let mapX = 8;
+    let mapY = 8;
+    let mapS = 64;
+
+    let map = [
+        1, 1, 1, 1, 1, 1, 1, 1,
+        1, 0, 1, 0, 0, 0, 0, 1,
+        1, 0, 1, 0, 0, 0, 0, 1,
+        1, 0, 1, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 1, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 1,
+        1, 1, 1, 1, 1, 1, 1, 1,
+    ];
+
+    let rayLines = [];
+
+    let map3d = [];
+
+    const DR = 0.0174533;
+
+    function drawPlayer(game) {
+        player.rect = new Phaser.Geom.Rectangle(player.x, player.y, 10, 10);
+        player.graphics = game.add.graphics({ fillStyle: { color: 0xff0000 } });
+        player.graphics.fillRectShape(player.rect);
+
+        player.directionGraphics = game.add.graphics({ lineStyle: { width: 3, color: 0xaa00aa } });
+        player.directionLine = new Phaser.Geom.Line(player.x + 5, player.y + 5, player.x + player.pdx * 5, player.y + player.pdy * 5);
+        player.directionGraphics.strokeLineShape(player.directionLine);
+    }
+
+    function clearPlayer() {
+        player.graphics.destroy();
+        player.directionGraphics.destroy();
+    }
+
+    function draw2DMap(game) {
+        for(let i = 0; i < mapY; i++) {
+            for(let j = 0; j < mapX; j++) {
+                let rect = new Phaser.Geom.Rectangle(j * mapS, i * mapS, mapS-1, mapS-1);
+                let graphics = game.add.graphics({ fillStyle: { color: map[i * mapX + j] === 1 ? 0xffffff : 0x000000 } });
+                graphics.fillRectShape(rect);
+            }
+        }
+    }
+
+    function movePlayer(game) {
+        if (keyW.isDown) {
+            player.x += player.pdx;
+            player.y += player.pdy;
+        } else if (keyA.isDown) {
+            player.pa -= 0.1;
+            if(player.pa < 0)
+                player.pa += 2 * Math.PI;
+            player.pdx = Math.cos(player.pa) * 5;
+            player.pdy = Math.sin(player.pa) * 5;
+        } else if (keyS.isDown) {
+            player.x -= player.pdx;
+            player.y -= player.pdy;
+        } else if (keyD.isDown) {
+            player.pa += 0.1;
+            if(player.pa > 2 * Math.PI)
+               player.pa -= 2 * Math.PI;
+            player.pdx = Math.cos(player.pa) * 5;
+            player.pdy = Math.sin(player.pa) * 5;
+        }
+
+        clearPlayer();
+        drawPlayer(game);
+    }
+
+    function drawRays3D(game) {
+        let r = 0;
+        let mx = 0;
+        let my = 0;
+        let mp = 0;
+        let dof = 0;
+        let rx = 0.0;
+        let ry = 0.0;
+        let xo = 0;
+        let yo = 0;
+
+        let disT;
+
+        let ra = player.pa - DR * 30;
+        if(ra < 0)
+            ra += 2 * Math.PI; 
+        else if (ra > 2 * Math.PI) {
+            ra -= 2 * Math.PI;
+        }
+ 
+        
+        for(let i = 0; i < 60; i++) {
+
+            // Check Horizontal Lines
+            dof = 0;
+
+            let disH = Infinity;
+            let hx = player.x;
+            let hy = player.y;
+
+            let aTan = -1/Math.tan(ra);
+   
+            if(ra > Math.PI) { //looking up    
+                ry = ((Math.trunc(player.y) >> 6) << 6) - 0.0001;
+                rx = (player.y - ry) * aTan + player.x;
+                yo = -64;
+                xo = -yo * aTan;
+            }
+            else if(ra < Math.PI) { //looking down
+                ry = ((Math.trunc(player.y) >> 6) << 6) + 64;
+                rx = (player.y - ry) * aTan + player.x;
+                yo = 64;
+                xo = -yo * aTan;
+            }
+            else { // looking straight left or right 
+          
+                rx = player.x;
+                ry = player.y;
+                dof = 8;
+            }
+            while(dof < 8) {
+                mx = Math.trunc(rx) >> 6; 
+                my = Math.trunc(ry) >> 6;
+                mp = my * mapX + mx;
+                if(mp > 0 && mp < mapX*mapY && map[mp] === 1) { // hit wall
+                    dof = 8;
+                    hx = rx;
+                    hy = ry;
+                    disH = dist(player.x, player.y, hx, hy, ra);
+                } else { // next line
+                    rx += xo;
+                    ry += yo;
+                    dof += 1;
+                }
+            }
+
+            /*
+            let graphics = game.add.graphics({ lineStyle: { width: 1, color: 0x00ff00 } });
+            let line = new Phaser.Geom.Line(player.x + 5, player.y + 5, rx, ry);
+            graphics.strokeLineShape(line);
+
+            rayLines.push({graphics, line});
+*/
+           //Check vertical lines
+
+            let disV = Infinity;
+            let vx = player.x;
+            let vy = player.y;
+            
+            const P2 = Math.PI / 2;
+            const P3 = 3 * Math.PI / 2; 
+
+            dof = 0;
+            let nTan = -Math.tan(ra);
+   
+            if(ra > P2 && ra < P3) { //looking left
+            
+                rx = ((Math.trunc(player.x) >> 6) << 6) - 0.0001;
+                ry = (player.x - rx) * nTan + player.y;
+                xo = -64;
+                yo = -xo * nTan;
+            }
+            else if(ra < P2 || ra > P3) { //looking right
+          
+                rx = ((Math.trunc(player.x) >> 6) << 6) + 64;
+                ry = (player.x - rx) * nTan + player.y;
+                xo = 64;
+                yo = -xo * nTan;
+            }
+            else { // looking straight up or down 
+          
+                rx = player.x;
+                ry = player.y;
+                dof = 8;
+            }
+            while(dof < 8) {
+                mx = Math.trunc(rx) >> 6; 
+                my = Math.trunc(ry) >> 6;
+                mp = my * mapX + mx;
+                if(mp > 0 && mp < mapX*mapY && map[mp] === 1) { // hit wall
+                    dof = 8;
+                    vx = rx;
+                    vy = ry;
+                    disV = dist(player.x, player.y, vx, vy, ra);
+                } else { // next line
+                    rx += xo;
+                    ry += yo;
+                    dof += 1;
+                }
+            }
+
+            /*
+            let graphicsVV = game.add.graphics({ lineStyle: { width: 1, color: 0x00ffff } });
+            let lineVV = new Phaser.Geom.Line(player.x + 5, player.y + 5, vx, vy);
+            graphicsVV.strokeLineShape(lineVV);
+
+            rayLines.push({graphics: graphicsVV, lineVV});
+            */
+         
+            let wallColor = undefined; 
+
+            if(disV < disH) {
+                rx = vx;
+                ry = vy;
+                disT = disV;
+                wallColor = 0xebc634;
+            } else {
+                rx = hx;
+                ry = hy;
+                disT = disH;
+                wallColor = 0xffff00;
+            }
+
+
+            //console.log(disV, disH)
+            
+            let graphicsV = game.add.graphics({ lineStyle: { width: 1, color: wallColor} });
+            let lineV = new Phaser.Geom.Line(player.x + 5, player.y + 5, rx, ry);
+            graphicsV.strokeLineShape(lineV);
+
+            rayLines.push({graphics: graphicsV, line: lineV});
+
+
+            // 3d walls
+
+            let ca = player.pa - ra;
+            if(ca < 0)
+                ca += 2 * Math.PI;
+            if(ca > 2 * Math.PI)
+                ca -= 2 * Math.PI;
+            disT = disT * Math.cos(ca); // fix fisheye
+
+            let lineH = (mapS * 320)/disT;
+            if(lineH > 320)
+                line = 320;
+
+            let lineO = 160 - lineH / 2;
+
+            let graphicsW = game.add.graphics({ lineStyle: { width: 8, color: wallColor } });
+            let lineW = new Phaser.Geom.Line(i * 8 + 530, lineO, i * 8 + 530, lineH + lineO);
+            graphicsW.strokeLineShape(lineW);
+
+            map3d.push({graphics: graphicsW, line: lineW});
+            
+            ra += DR;
+            if(ra < 0)
+                ra += 2 * Math.PI; 
+            else if (ra > 2 * Math.PI) {
+                ra -= 2 * Math.PI;
+            }
+        }
+    }
+
+    function clearRays() {
+        for( {graphics, line} of rayLines) {
+            graphics.clear();
+        }
+        rayLines.length = 0;
+    }
+
+    function clearMap3d() {
+        for( {graphics, line} of map3d) {
+            graphics.clear();
+        }
+        map3d.length = 0;
+    }
+
+    function dist(ax, ay, bx, by, ang) {
+        return Math.sqrt((bx-ax) * (bx-ax) + (by-ay) * (by-ay));
+    }
+
+    function preload () {
+
+        this.load.image('robot_head_blue', 'assets/sprites/robot_head_blue.png');
+        this.load.image('robot_head_green', 'assets/sprites/robot_head_green.png');
+        this.load.image('robot_head_yellow', 'assets/sprites/robot_head_yellow.png');
+        this.load.image('robot_head_red', 'assets/sprites/robot_head_red.png');
+
+        this.load.image('robot_blue', 'assets/sprites/robot_blue.png');
+        this.load.image('robot_green', 'assets/sprites/robot_green.png');
+        this.load.image('robot_yellow', 'assets/sprites/robot_yellow.png');
+        this.load.image('robot_red', 'assets/sprites/robot_red.png');
+
+        this.load.image('tile_grass_1', 'assets/sprites/tileGrass1.png');
+        this.load.image('tile_grass_2', 'assets/sprites/tileGrass2.png');
+
+        this.load.image('pause', 'assets/sprites/pause.png');
+        this.load.image('red', 'assets/sprites/red.png');
+
+    }
+
+    function create () {
+
+        this.cameras.main.backgroundColor.setTo(75,75,75);
+
+        keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+        keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+        keyS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+        keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+
+        player.pdx = Math.cos(player.pa) * 5;
+        player.pdy = Math.sin(player.pa) * 5;
+
+        draw2DMap(this);
+        drawPlayer(this, 100, 100);
+    }
+
+    function update() {
+        clearRays();
+        clearMap3d();
+        movePlayer(this);
+        drawRays3D(this);
+    }
+
+    </script>
+
+</body>
+</html>
