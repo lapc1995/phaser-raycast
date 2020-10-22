@@ -349,7 +349,41 @@
 
         draw2DMap(this);
         drawPlayer(this, 100, 100);
-    }
+
+        this.input.on('pointerdown', function (pointer) {
+            this.input.mouse.requestPointerLock();
+        }, this);
+
+        this.input.keyboard.on('keydown-Q', function (event) {
+            if (this.input.mouse.locked)
+            {
+                this.input.mouse.releasePointerLock();
+            }
+        }, this);
+
+        this.input.on('pointermove', function (pointer) {
+
+                if (this.input.mouse.locked)
+                {
+                    console.log(pointer.movementX)
+                    if(pointer.movementX > 0) {
+                        player.pa += (0.01 * pointer.movementX);
+                        if(player.pa > 2 * Math.PI)
+                            player.pa -= 2 * Math.PI;
+                        player.pdx = Math.cos(player.pa) * 5;
+                        player.pdy = Math.sin(player.pa) * 5;
+
+                    } else {
+                        player.pa += (0.01 * pointer.movementX);
+                        if(player.pa < 0)
+                            player.pa += 2 * Math.PI;
+                        player.pdx = Math.cos(player.pa) * 5;
+                        player.pdy = Math.sin(player.pa) * 5;
+                    }
+            
+                }
+                }, this);
+        }
 
     function update() {
         clearRays();
