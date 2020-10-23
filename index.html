@@ -142,6 +142,8 @@
 
         let disT;
 
+        let hmp, vmp;
+
         let ra = player.pa - DR * 30;
         if(ra < 0)
             ra += 2 * Math.PI; 
@@ -149,7 +151,6 @@
             ra -= 2 * Math.PI;
         }
  
-        
         for(let i = 0; i < 60; i++) {
 
             // Check Horizontal Lines
@@ -188,6 +189,7 @@
                     hx = rx;
                     hy = ry;
                     disH = dist(player.x, player.y, hx, hy, ra);
+                    hmp = mp; 
                 } else { // next line
                     rx += xo;
                     ry += yo;
@@ -195,13 +197,6 @@
                 }
             }
 
-            /*
-            let graphics = game.add.graphics({ lineStyle: { width: 1, color: 0x00ff00 } });
-            let line = new Phaser.Geom.Line(player.x + 5, player.y + 5, rx, ry);
-            graphics.strokeLineShape(line);
-
-            rayLines.push({graphics, line});
-*/
            //Check vertical lines
 
             let disV = Infinity;
@@ -243,6 +238,7 @@
                     vx = rx;
                     vy = ry;
                     disV = dist(player.x, player.y, vx, vy, ra);
+                    vmp = mp; 
                 } else { // next line
                     rx += xo;
                     ry += yo;
@@ -250,14 +246,6 @@
                 }
             }
 
-            /*
-            let graphicsVV = game.add.graphics({ lineStyle: { width: 1, color: 0x00ffff } });
-            let lineVV = new Phaser.Geom.Line(player.x + 5, player.y + 5, vx, vy);
-            graphicsVV.strokeLineShape(lineVV);
-
-            rayLines.push({graphics: graphicsVV, lineVV});
-            */
-         
             let wallColor = undefined; 
 
             if(disV < disH) {
@@ -265,24 +253,19 @@
                 ry = vy;
                 disT = disV;
                 wallColor = 0xebc634;
+                mp = vmp;
             } else {
                 rx = hx;
                 ry = hy;
                 disT = disH;
                 wallColor = 0xffff00;
+                mp = hmp;
             }
             
-            /*
-            let graphicsV = game.add.graphics({ lineStyle: { width: 1, color: wallColor} });
-            let lineV = new Phaser.Geom.Line(player.x + 5, player.y + 5, rx, ry);
-            graphicsV.strokeLineShape(lineV);
-
-            rayLines.push({graphics: graphicsV, line: lineV});*/
             updateRayLine(i, player.x + 5, player.y + 5, rx, ry);
 
 
             // 3d walls
-
             let ca = player.pa - ra;
             if(ca < 0)
                 ca += 2 * Math.PI;
@@ -296,14 +279,7 @@
 
             let lineO = 160 - lineH / 2;
 
-/*
-            let graphicsW = game.add.graphics({ lineStyle: { width: 8, color: wallColor } });
-            let lineW = new Phaser.Geom.Line(i * 8 + 530, lineO, i * 8 + 530, lineH + lineO);
-            graphicsW.strokeLineShape(lineW);
-
-            map3d.push({graphics: graphicsW, line: lineW});
-            */
-            updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO);
+            updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO, mp);
 
             ra += DR;
             if(ra < 0)
@@ -361,19 +337,77 @@
         for(let i = 0; i < rayNumber; i++) {
             let line = new Phaser.Geom.Line(0, 0, 0, 0);
             mapGraphic.strokeLineShape(line);
-            map3d.push(line);
+            map3d.push({line, n: 0});
         }
     }
 
-    function updateMap3d(index, x1, y1, x2, y2) {
-        map3d[index].setTo(x1, y1, x2, y2);
+    function updateMap3d(index, x1, y1, x2, y2, n) {
+        map3d[index].line.setTo(x1, y1, x2, y2);
+        map3d[index].n = n;
     }
 
     function updateMap3dGraphics() {
         mapGraphic.clear();
+
+        const test = []
+
+        let lastN = 0;
+        let n = 0;
+
+        const sections = {}; 
+
         for(let i = 0; i < rayNumber; i++) {
-            mapGraphic.strokeLineShape(map3d[i]);
+        
+            let currentN = map3d[i].n;
+
+            if(currentN != lastN) {
+                lastN = currentN;
+                n = 0;
+                sections[currentN] = 1;
+            } else {
+                sections[currentN] = sections[currentN] + 1
+            }
+
         }
+      
+        lastN = 0;
+        n = 0;
+
+        for(let i = 0; i < rayNumber; i++) {
+            //mapGraphic.strokeLineShape(map3d[i]);
+            const line = map3d[i].line;
+            let currentN = map3d[i].n;
+
+            var x = line.x1;
+            var lineSize = Math.abs(line.y1 - line.y2);
+    
+            if(currentN != lastN) {
+                lastN = currentN;
+                n = 0;
+            } 
+
+
+            const indexes = takeSpreadIndexes(64, sections[currentN]);
+            console.log(indexes);
+            var iv = imageTest.pixels[indexes[n]];
+         
+            n++;
+
+            const ready = takeSpread(iv,  lineSize/8); 
+
+            
+        
+            let g = 0;
+
+            for(let y = line.y1; y < line.y2; y += 8) {
+                mapGraphic.fillStyle(ready[g]);
+                mapGraphic.fillRect(x, y, 8, 8);
+                g++;
+            }
+
+     
+        }
+       
     }
 
     function isColliding(x, y) {
@@ -386,8 +420,71 @@
 
     }
 
+    function loadPixelInfo(game) {
+        var src = game.textures.get('wall').getSourceImage();
+
+        var canvas = game.textures.createCanvas('map', src.width, src.height).draw(0, 0, src);
+
+        //  You can now access the CanvasTexture properties, such as canvas.imageData
+
+        //  Here we'll just create a rectangle for each pixel, with a unique size
+
+        var pixel = new Phaser.Display.Color();
+
+        var pixelMap = []
+
+        for (var x = 0; x < src.width; x++) {
+            
+            let column = [];
+
+            for (var y = 0; y < src.height; y++) {
+
+
+
+                canvas.getPixel(x, y, pixel);
+
+                if (pixel.a > 0)
+                {
+                    //game.add.rectangle(x * 4, y * 8, 4, 8, pixel.color);
+                    column.push(pixel.color);
+                }
+            }
+            pixelMap.push(column);
+        }
+        
+        return {pixels: pixelMap, height: src.height, width: src.width};
+    }
+    
+    /*
+    def takespread(sequence, num):
+    length = float(len(sequence))
+    for i in range(num):
+        yield sequence[int(ceil(i * length / num))]
+
+*/
+    function takeSpread(sequence,  num) {
+        const result = []
+
+        const length = sequence.length;
+        for(let i = 0; i < num; i++) {
+            result.push(sequence[Math.ceil(i * length / num)]);
+        }
+        return result;
+    }
+
+    function takeSpreadIndexes(length, num) {
+        const result = [];
+
+        for(let i = 0; i < num; i++) {
+            result.push(Math.ceil(i * length / num));
+        }
+
+        return result;
+    }
+
     function preload () {
 
+/*
         this.load.image('robot_head_blue', 'assets/sprites/robot_head_blue.png');
         this.load.image('robot_head_green', 'assets/sprites/robot_head_green.png');
         this.load.image('robot_head_yellow', 'assets/sprites/robot_head_yellow.png');
@@ -403,8 +500,12 @@
 
         this.load.image('pause', 'assets/sprites/pause.png');
         this.load.image('red', 'assets/sprites/red.png');
+*/
+        this.load.image('wall', 'assets/sprites/pattern112.png');
 
     }
+
+    let imageTest;
 
     function create () {
         draw2DMap(this);
@@ -422,12 +523,13 @@
         player.pdx = Math.cos(player.pa) * 5;
         player.pdy = Math.sin(player.pa) * 5;
 
-       
-
-
         player.graphics = this.add.graphics({ fillStyle: { color: 0xff0000 } });
         player.directionGraphics = this.add.graphics({ lineStyle: { width: 3, color: 0xaa00aa } });
         drawPlayer(this, 100, 100);
+
+        imageTest = loadPixelInfo(game);
+
+
 
         this.input.on('pointerdown', function (pointer) {
             this.input.mouse.requestPointerLock();
