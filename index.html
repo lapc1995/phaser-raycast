@@ -29,12 +29,12 @@
     let player = {
         x: 100,
         y: 100,
-        rect: undefined,
+        rect: new Phaser.Geom.Rectangle(0, 0, 0, 0),
         graphics: undefined,
         pdx: 0.0,
         pdy: 0.0,
         pa: 3 * Math.PI / 2,
-        directionLine: undefined,
+        directionLine: new Phaser.Geom.Line(0, 0, 0, 0),
         directionGraphics: undefined,
     };
 
@@ -58,25 +58,26 @@
         1, 1, 1, 1, 1, 1, 1, 1,
     ];
 
-    let rayLines = [];
+    const rayNumber = 60;
+    const rayLines = [];
+    let lineGraphic;
 
-    let map3d = [];
+    const map3d = [];
+    let mapGraphic;
 
     const DR = 0.0174533;
 
     function drawPlayer(game) {
-        player.rect = new Phaser.Geom.Rectangle(player.x, player.y, 10, 10);
-        player.graphics = game.add.graphics({ fillStyle: { color: 0xff0000 } });
+        player.rect.setTo(player.x, player.y, 10, 10);
         player.graphics.fillRectShape(player.rect);
 
-        player.directionGraphics = game.add.graphics({ lineStyle: { width: 3, color: 0xaa00aa } });
-        player.directionLine = new Phaser.Geom.Line(player.x + 5, player.y + 5, player.x + player.pdx * 5, player.y + player.pdy * 5);
+        player.directionLine.setTo(player.x + 5, player.y + 5, player.x + player.pdx * 5, player.y + player.pdy * 5);
         player.directionGraphics.strokeLineShape(player.directionLine);
     }
 
     function clearPlayer() {
-        player.graphics.destroy();
-        player.directionGraphics.destroy();
+        player.graphics.clear();
+        player.directionGraphics.clear();
     }
 
     function draw2DMap(game) {
@@ -256,15 +257,14 @@
                 disT = disH;
                 wallColor = 0xffff00;
             }
-
-
-            //console.log(disV, disH)
             
+            /*
             let graphicsV = game.add.graphics({ lineStyle: { width: 1, color: wallColor} });
             let lineV = new Phaser.Geom.Line(player.x + 5, player.y + 5, rx, ry);
             graphicsV.strokeLineShape(lineV);
 
-            rayLines.push({graphics: graphicsV, line: lineV});
+            rayLines.push({graphics: graphicsV, line: lineV});*/
+            updateRayLine(i, player.x + 5, player.y + 5, rx, ry);
 
 
             // 3d walls
@@ -282,19 +282,25 @@
 
             let lineO = 160 - lineH / 2;
 
+/*
             let graphicsW = game.add.graphics({ lineStyle: { width: 8, color: wallColor } });
             let lineW = new Phaser.Geom.Line(i * 8 + 530, lineO, i * 8 + 530, lineH + lineO);
             graphicsW.strokeLineShape(lineW);
 
             map3d.push({graphics: graphicsW, line: lineW});
-            
+            */
+            updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO);
+
             ra += DR;
             if(ra < 0)
                 ra += 2 * Math.PI; 
             else if (ra > 2 * Math.PI) {
                 ra -= 2 * Math.PI;
             }
+            
         }
+        updateRayLineGraphics();
+        updateMap3dGraphics();
     }
 
     function clearRays() {
@@ -313,6 +319,47 @@
 
     function dist(ax, ay, bx, by, ang) {
         return Math.sqrt((bx-ax) * (bx-ax) + (by-ay) * (by-ay));
+    }
+
+    function initRayLines(game) {
+        lineGraphic = game.add.graphics({ lineStyle: { width: 1, color: 0xff00ff} });
+        for(let i = 0; i < rayNumber; i++) {
+            let line = new Phaser.Geom.Line(0 , 0, 0, 0);
+            lineGraphic.strokeLineShape(line);
+            rayLines.push(line);
+        }
+
+    }
+
+    function updateRayLine(index, x1, y1, x2, y2) {
+        rayLines[index].setTo(x1, y1, x2, y2);
+    }
+
+    function updateRayLineGraphics() {
+        lineGraphic.clear();
+        for(let i = 0; i < rayNumber; i++) {
+            lineGraphic.strokeLineShape(rayLines[i]);
+        }
+    }
+
+    function initMap3d(game) {
+        mapGraphic = game.add.graphics({ lineStyle: { width: 8, color: 0xffff00 } });
+        for(let i = 0; i < rayNumber; i++) {
+            let line = new Phaser.Geom.Line(0, 0, 0, 0);
+            mapGraphic.strokeLineShape(line);
+            map3d.push(line);
+        }
+    }
+
+    function updateMap3d(index, x1, y1, x2, y2) {
+        map3d[index].setTo(x1, y1, x2, y2);
+    }
+
+    function updateMap3dGraphics() {
+        mapGraphic.clear();
+        for(let i = 0; i < rayNumber; i++) {
+            mapGraphic.strokeLineShape(map3d[i]);
+        }
     }
 
     function preload () {
@@ -336,8 +383,12 @@
     }
 
     function create () {
+        draw2DMap(this);
 
         this.cameras.main.backgroundColor.setTo(75,75,75);
+
+        initRayLines(this);
+        initMap3d(this);
 
         keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
@@ -347,7 +398,11 @@
         player.pdx = Math.cos(player.pa) * 5;
         player.pdy = Math.sin(player.pa) * 5;
 
-        draw2DMap(this);
+       
+
+
+        player.graphics = this.add.graphics({ fillStyle: { color: 0xff0000 } });
+        player.directionGraphics = this.add.graphics({ lineStyle: { width: 3, color: 0xaa00aa } });
         drawPlayer(this, 100, 100);
 
         this.input.on('pointerdown', function (pointer) {
@@ -365,7 +420,6 @@
 
                 if (this.input.mouse.locked)
                 {
-                    console.log(pointer.movementX)
                     if(pointer.movementX > 0) {
                         player.pa += (0.01 * pointer.movementX);
                         if(player.pa > 2 * Math.PI)
@@ -386,8 +440,8 @@
         }
 
     function update() {
-        clearRays();
-        clearMap3d();
+      
+        
         movePlayer(this);
         drawRays3D(this);
     }
