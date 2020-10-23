@@ -92,8 +92,15 @@
 
     function movePlayer(game) {
         if (keyW.isDown) {
-            player.x += player.pdx;
-            player.y += player.pdy;
+          
+            let tempX = player.x + player.pdx;
+            let tempY = player.y + player.pdy;
+
+            if(!isColliding(tempX, tempY)) { 
+                player.x = tempX;
+                player.y = tempY;
+            }
+
         } else if (keyA.isDown) {
             player.pa -= 0.1;
             if(player.pa < 0)
@@ -101,8 +108,15 @@
             player.pdx = Math.cos(player.pa) * 5;
             player.pdy = Math.sin(player.pa) * 5;
         } else if (keyS.isDown) {
-            player.x -= player.pdx;
-            player.y -= player.pdy;
+
+            let tempX = player.x - player.pdx;
+            let tempY = player.y - player.pdy;
+
+            if(!isColliding(tempX, tempY)) { 
+                player.x = tempX;
+                player.y = tempY;
+            }
+
         } else if (keyD.isDown) {
             player.pa += 0.1;
             if(player.pa > 2 * Math.PI)
@@ -360,6 +374,16 @@
         for(let i = 0; i < rayNumber; i++) {
             mapGraphic.strokeLineShape(map3d[i]);
         }
+    }
+
+    function isColliding(x, y) {
+
+        const mx = ((Math.trunc(x + 5) >> 6) );
+        const my = ((Math.trunc(y + 5) >> 6) );
+        const mp = my * mapX + mx;
+
+        return map[mp] != 0 
+
     }
 
     function preload () {
