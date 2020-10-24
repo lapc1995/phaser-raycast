@@ -248,18 +248,21 @@
 
             let wallColor = undefined; 
 
+            let vertical = false;
             if(disV < disH) {
                 rx = vx;
                 ry = vy;
                 disT = disV;
                 wallColor = 0xebc634;
                 mp = vmp;
+                vertical = true;
             } else {
                 rx = hx;
                 ry = hy;
                 disT = disH;
                 wallColor = 0xffff00;
                 mp = hmp;
+                vertical = false;
             }
             
             updateRayLine(i, player.x + 5, player.y + 5, rx, ry);
@@ -279,7 +282,7 @@
 
             let lineO = 160 - lineH / 2;
 
-            updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO, mp);
+            updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO, rx, ry, vertical);
 
             ra += DR;
             if(ra < 0)
@@ -341,24 +344,29 @@
         }
     }
 
-    function updateMap3d(index, x1, y1, x2, y2, n) {
+    function updateMap3d(index, x1, y1, x2, y2, rx, ry, vertical) {
         map3d[index].line.setTo(x1, y1, x2, y2);
-        map3d[index].n = n;
+        map3d[index].rx = rx;
+        map3d[index].ry = ry;
+        map3d[index].vertical = vertical;
     }
 
     function updateMap3dGraphics() {
         mapGraphic.clear();
 
         const test = []
-
+/*
         let lastN = 0;
         let n = 0;
 
         const sections = {}; 
 
+
         for(let i = 0; i < rayNumber; i++) {
         
             let currentN = map3d[i].n;
+
+            console.log( map3d[i]);
 
             if(currentN != lastN) {
                 lastN = currentN;
@@ -372,26 +380,33 @@
       
         lastN = 0;
         n = 0;
-
+        
+*/
         for(let i = 0; i < rayNumber; i++) {
             //mapGraphic.strokeLineShape(map3d[i]);
             const line = map3d[i].line;
-            let currentN = map3d[i].n;
+
+            const rr =  map3d[i].vertical ? map3d[i].ry : map3d[i].rx;
+
+            const position =  Math.ceil(rr - (rr >> 6) * mapS) - 1;
+                      
+           // let currentN = map3d[i].n;
 
             var x = line.x1;
             var lineSize = Math.abs(line.y1 - line.y2);
     
+    /*
             if(currentN != lastN) {
                 lastN = currentN;
                 n = 0;
             } 
+*/
 
-
-            const indexes = takeSpreadIndexes(64, sections[currentN]);
-            console.log(indexes);
-            var iv = imageTest.pixels[indexes[n]];
+            //const indexes = takeSpreadIndexes(64, sections[currentN]);
+     
+            var iv = imageTest.pixels[position];
          
-            n++;
+        //    n++;
 
             const ready = takeSpread(iv,  lineSize/8); 
 
