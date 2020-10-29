@@ -53,7 +53,7 @@
         1, 0, 1, 0, 0, 0, 0, 1,
         1, 0, 1, 0, 0, 0, 0, 1,
         1, 0, 0, 0, 0, 0, 0, 1,
-        1, 0, 0, 0, 0, 1, 0, 1,
+        1, 0, 0, 0, 0, 2, 0, 1,
         1, 0, 0, 0, 0, 0, 0, 1,
         1, 1, 1, 1, 1, 1, 1, 1,
     ];
@@ -66,6 +66,10 @@
     let mapGraphic;
 
     const DR = 0.0174533;
+
+    const sprites = [];
+    const rayDistances = new Array(rayNumber);
+    const rayHitPoints = new Array(rayNumber);
 
     function drawPlayer(game) {
         player.rect.setTo(player.x, player.y, 10, 10);
@@ -142,7 +146,7 @@
 
         let disT;
 
-        let hmp, vmp;
+        let hmp, vmp, vtype, htype, type;
 
         let ra = player.pa - DR * 30;
         if(ra < 0)
@@ -184,12 +188,13 @@
                 mx = Math.trunc(rx) >> 6; 
                 my = Math.trunc(ry) >> 6;
                 mp = my * mapX + mx;
-                if(mp > 0 && mp < mapX*mapY && map[mp] === 1) { // hit wall
+                if(mp > 0 && mp < mapX*mapY && map[mp] != 0) { // hit wall
                     dof = 8;
                     hx = rx;
                     hy = ry;
                     disH = dist(player.x, player.y, hx, hy, ra);
                     hmp = mp; 
+                    htype = map[mp];
                 } else { // next line
                     rx += xo;
                     ry += yo;
@@ -233,12 +238,13 @@
                 mx = Math.trunc(rx) >> 6; 
                 my = Math.trunc(ry) >> 6;
                 mp = my * mapX + mx;
-                if(mp > 0 && mp < mapX*mapY && map[mp] === 1) { // hit wall
+                if(mp > 0 && mp < mapX*mapY && map[mp] != 0) { // hit wall
                     dof = 8;
                     vx = rx;
                     vy = ry;
                     disV = dist(player.x, player.y, vx, vy, ra);
                     vmp = mp; 
+                    vtype = map[mp];
                 } else { // next line
                     rx += xo;
                     ry += yo;
@@ -256,6 +262,7 @@
                 wallColor = 0xebc634;
                 mp = vmp;
                 vertical = true;
+                type = vtype;
             } else {
                 rx = hx;
                 ry = hy;
@@ -263,8 +270,12 @@
                 wallColor = 0xffff00;
                 mp = hmp;
                 vertical = false;
+                type = htype;
             }
             
+            rayDistances[i] = disT;
+            rayHitPoints[i] = {'x': rx, 'y': ry};
+
             updateRayLine(i, player.x + 5, player.y + 5, rx, ry);
 
 
@@ -282,7 +293,7 @@
 
             let lineO = 160 - lineH / 2;
 
-            updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO, rx, ry, vertical);
+            updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO, rx, ry, vertical, type);
 
             ra += DR;
             if(ra < 0)
@@ -344,11 +355,12 @@
         }
     }
 
-    function updateMap3d(index, x1, y1, x2, y2, rx, ry, vertical) {
+    function updateMap3d(index, x1, y1, x2, y2, rx, ry, vertical, type) {
         map3d[index].line.setTo(x1, y1, x2, y2);
         map3d[index].rx = rx;
         map3d[index].ry = ry;
         map3d[index].vertical = vertical;
+        map3d[index].type = type;
     }
 
     function updateMap3dGraphics() {
@@ -390,7 +402,7 @@
 
             const position =  Math.ceil(rr - (rr >> 6) * mapS) - 1;
                       
-           // let currentN = map3d[i].n;
+         
 
             var x = line.x1;
             var lineSize = Math.abs(line.y1 - line.y2);
@@ -404,18 +416,28 @@
 
             //const indexes = takeSpreadIndexes(64, sections[currentN]);
      
-            var iv = imageTest.pixels[position];
+            let pixels;
+
+            if(map3d[i].type === 1) {
+                pixels = pixelInfo.get('wall').pixels[position];
+            } else {
+                pixels = pixelInfo.get('tile_grass_1').pixels[position];
+            }
+
+            //var iv = imageTest.pixels[position];
          
         //    n++;
 
-            const ready = takeSpread(iv,  lineSize/8); 
+            const ready = takeSpread(pixels, lineSize/8); 
 
             
         
             let g = 0;
 
             for(let y = line.y1; y < line.y2; y += 8) {
-                mapGraphic.fillStyle(ready[g]);
+                let color = map3d[i].vertical ? (ready[g] >> 1) & 8355711 : ready[g];
+               
+                mapGraphic.fillStyle(color);
                 mapGraphic.fillRect(x, y, 8, 8);
                 g++;
             }
@@ -435,39 +457,49 @@
 
     }
 
-    function loadPixelInfo(game) {
-        var src = game.textures.get('wall').getSourceImage();
+    function loadPixelInfo(game, textureNames) {
 
-        var canvas = game.textures.createCanvas('map', src.width, src.height).draw(0, 0, src);
+        const pixelMap = new Map();
 
-        //  You can now access the CanvasTexture properties, such as canvas.imageData
+        for(name of textureNames) {
 
-        //  Here we'll just create a rectangle for each pixel, with a unique size
+            var src = game.textures.get(name).getSourceImage();
 
-        var pixel = new Phaser.Display.Color();
+            var canvas = game.textures.createCanvas(`${name}-map`, src.width, src.height).draw(0, 0, src);
 
-        var pixelMap = []
+            //  You can now access the CanvasTexture properties, such as canvas.imageData
 
-        for (var x = 0; x < src.width; x++) {
-            
-            let column = [];
+            //  Here we'll just create a rectangle for each pixel, with a unique size
 
-            for (var y = 0; y < src.height; y++) {
+            var pixel = new Phaser.Display.Color();
+
+            var pixelList = []
+
+            for (var x = 0; x < src.width; x++) {
+                
+                let column = [];
+
+                for (var y = 0; y < src.height; y++) {
 
 
 
-                canvas.getPixel(x, y, pixel);
+                    canvas.getPixel(x, y, pixel);
 
-                if (pixel.a > 0)
-                {
-                    //game.add.rectangle(x * 4, y * 8, 4, 8, pixel.color);
-                    column.push(pixel.color);
+                    if (pixel.a > 0)
+                    {
+                        //game.add.rectangle(x * 4, y * 8, 4, 8, pixel.color);
+                        column.push(pixel.color);
+
+
+                    }
                 }
+                pixelList.push(column);
             }
-            pixelMap.push(column);
+
+            pixelMap.set(name, {pixels: pixelList, height: src.height, width: src.width});
         }
+        return pixelMap;
         
-        return {pixels: pixelMap, height: src.height, width: src.width};
     }
     
     /*
@@ -497,6 +529,114 @@
         return result;
     }
 
+
+    function addSprite(game, x, y) {
+        sprites.push({x, y, rect: new Phaser.Geom.Rectangle(0, 0, 0, 0)});
+    }
+
+    function renderSprites(game) {
+        for(let s of sprites) {
+            s.rect.setTo(s.x, s.y, 10, 10);
+            player.graphics.fillRectShape(s.rect);
+        }   
+    }
+
+    function renderSprites3d(game) {
+        for(let s of sprites) {
+           s.distance = dist(player.x, player.y, s.x, s.y);
+        }
+
+        sprites.sort((a,b) => b.distance - a.distance);
+
+        for(let s of sprites) {
+
+            let visible = false;
+            let index;
+
+            for(let i = 0; i < rayNumber && !visible; i++) {
+
+                if(rayDistances[i] < s.distance) {
+                    continue
+                }
+
+                const relativeHitX = rayHitPoints[i].x - player.x;
+                const relativeHitY = rayHitPoints[i].y - player.y;
+
+                const m = relativeHitY / relativeHitX;
+                const b = relativeHitY - m * relativeHitX;
+
+                //const m = rayHitPoints[i].y - player.y / rayHitPoints[i].x - player.x;
+                // b = y - mx
+                //const b = rayHitPoints[i].y - m * rayHitPoints[i].x;
+
+                //y = mx + b
+               // const tempY = m * s.x + b;
+                //console.log(tempY, s.y, m, s.x, b)
+                
+                //console.log(rayHitPoints[i].x);
+
+                const corners = [
+                {x: s.x, y: s.y}, 
+                    //                {x: rayHitPoints[i].x, y: rayHitPoints[i].y}, 
+                                 /*   {x: rayHitPoints[i].x + 5, y: rayHitPoints[i].y},
+                                    {x: rayHitPoints[i].x, y: rayHitPoints[i].y + 5},
+                                    {x: rayHitPoints[i].x + 5, y: rayHitPoints[i].y + 5}*/
+                                ] 
+
+/*
+
+                const ss = 20;
+
+                for(let i = 0; i <= ss; i++) {
+                    corners.push({x: rayHitPoints[i].x + i, y: rayHitPoints[i].y}) // up
+                    corners.push({x: rayHitPoints[i].x, y: rayHitPoints[i].y + i}) // left
+                    corners.push({x: rayHitPoints[i].x + i, y: rayHitPoints[i].y + ss}) // down
+                    corners.push({x: rayHitPoints[i].x + ss, y: rayHitPoints[i].y + i}) // right
+                }
+  */              
+
+                //for(let c of corners) {
+                    if(!visible) {
+                        const tempY = (m * (s.x - player.x) + b);
+                        visible = Math.abs( Math.trunc(tempY) - Math.trunc(s.y-player.y)) < 15;
+                        if(visible) {
+
+                            let tr = new Phaser.Geom.Rectangle(s.x, tempY + player.y, 10, 10);
+                            player.graphics.fillStyle(0x0000ff);
+                            player.graphics.fillRectShape(tr);
+
+                            let tl = new Phaser.Geom.Line(0 + player.x, (m * 0 + b) + player.y, s.x, tempY + player.y);
+                            player.graphics.lineStyle(5, 0x0000ff);
+                            player.graphics.strokeLineShape(tl);
+
+                            index = i;
+                            console.log(tempY,  s.y-player.y)
+                        }
+
+                                              
+                    }
+                //}
+
+               // visible = Math.trunc(tempY) === Math.trunc(s.y);
+                
+
+            }
+
+            if(visible) {
+                console.log('visible',s);
+
+                const line = map3d[index].line;
+
+                mapGraphic.fillStyle(0xff00ff);
+                mapGraphic.fillRect(line.x1, line.y2 - 10, 20, 20);
+            }
+
+
+        }
+
+
+    }
+
     function preload () {
 
 /*
@@ -516,11 +656,13 @@
         this.load.image('pause', 'assets/sprites/pause.png');
         this.load.image('red', 'assets/sprites/red.png');
 */
+        this.load.image('tile_grass_1', 'assets/sprites/tileGrass1.png');
         this.load.image('wall', 'assets/sprites/pattern112.png');
+        this.load.image('zombie_1', 'assets/sprites/zombie_1.png');
 
     }
 
-    let imageTest;
+    let pixelInfo;
 
     function create () {
         draw2DMap(this);
@@ -542,9 +684,11 @@
         player.directionGraphics = this.add.graphics({ lineStyle: { width: 3, color: 0xaa00aa } });
         drawPlayer(this, 100, 100);
 
-        imageTest = loadPixelInfo(game);
+        pixelInfo = loadPixelInfo(game, ['wall', 'tile_grass_1', 'zombie_1']);
 
-
+        addSprite(this, 300, 200);
+        //addSprite(this, 200, 200);
+        //addSprite(this, 300, 300);
 
         this.input.on('pointerdown', function (pointer) {
             this.input.mouse.requestPointerLock();
@@ -582,9 +726,11 @@
 
     function update() {
       
-        
         movePlayer(this);
         drawRays3D(this);
+        renderSprites(this);
+        renderSprites3d(this);
+       
     }
 
     </script>
