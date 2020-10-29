@@ -289,7 +289,7 @@
 
             let lineH = (mapS * 320)/disT;
             if(lineH > 320)
-                line = 320;
+                lineH = 320;
 
             let lineO = 160 - lineH / 2;
 
@@ -610,7 +610,6 @@
                             player.graphics.strokeLineShape(tl);
 
                             index = i;
-                            console.log(tempY,  s.y-player.y)
                         }
 
                                               
@@ -623,12 +622,24 @@
             }
 
             if(visible) {
-                console.log('visible',s);
+            
+
+                let lineH = (mapS * 320)/s.distance;
+                if(lineH > 320)
+                    lineH = 320;
+
+                let lineO = 160 - lineH / 2;
+
+                //updateMap3d(i, i * 8 + 530, lineO, i * 8 + 530, lineH + lineO, rx, ry, vertical, type);
+
+
+
+
 
                 const line = map3d[index].line;
 
-                mapGraphic.fillStyle(0xff00ff);
-                mapGraphic.fillRect(line.x1, line.y2 - 10, 20, 20);
+                mapGraphic.fillStyle(0x0000ff);
+                mapGraphic.fillRect(line.x1, lineH + lineO, 20, 20);
             }
 
 
