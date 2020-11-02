@@ -2,6 +2,7 @@
 <html>
 <head>
     <script src="//cdn.jsdelivr.net/npm/phaser@3.24.1/dist/phaser.min.js"></script>
+    <script defer src="./assets/scripts/bundle.js"></script>
 </head>
 <body>
 
@@ -72,6 +73,8 @@
     const rayDistances = new Array(rayNumber);
     const rayHitPoints = new Array(rayNumber);
 
+    const bullets = [];
+
     function drawPlayer(game) {
         player.rect.setTo(player.x, player.y, 10, 10);
         player.graphics.fillRectShape(player.rect);
@@ -97,8 +100,16 @@
 
     function movePlayer(game) {
 
-        if(keySpacebar.isDown) {
+        if (Phaser.Input.Keyboard.JustDown(keySpacebar)) {
             console.log('shoot');
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                pdx: player.pdx,
+                pdy: player.pdy,
+                speed: Phaser.Math.GetSpeed(600, 1),
+                rect: new Phaser.Geom.Rectangle(0 ,0, 0, 0),
+            });
         }
 
 
@@ -671,10 +682,9 @@
                 if(leftLine != undefined)
                     mapGraphic.fillRect(leftLine.x1, lineH + lineO, 8, 8);
                 if(rightLine != undefined)
-                mapGraphic.fillRect(rightLine.x1, lineH + lineO, 8, 8);
+                    mapGraphic.fillRect(rightLine.x1, lineH + lineO, 8, 8);
 
                 mapGraphic.fillRect(line.x1, lineH + lineO, 8, 8);
-
 
 
 
@@ -682,50 +692,19 @@
 
                 let indexes = [];
                 if(rightLine != undefined && leftLine != undefined)
-                    indexes = takeSpreadIndexes( pixels.length-1, /*Math.abs(rightLine.x1 - leftLine.x1)*/projectedWidth / 8);
-                console.log(indexes)
-                console.log(pixels.length, projectedWidth, projectedWidth / 8);
-                            /*
-                console.log(indexes);
-                let j = 0;
-                for(let i = 0; i < pixels.length; i++) {
-                    if(indexes.includes(i)) {
-                    const ready = takeSpread(pixels[i], lineH + lineO/8); 
-                    let g = 0;
-
-                    for(let y = lineO; y < lineO + lineH; y += 8) {
-                        
-                        if(leftLine != undefined) {
-                            
-                            mapGraphic.fillStyle(ready[g].color, 1);
-                            mapGraphic.fillRect(leftLine.x1 + i , y, 8, 8);
-                        }
-                        g++;
-
-                    
-                    }
-                    j++;
-                    }
-
-                }
-*/
-
-                //let pixels = pixelInfo.get('zombie_1_big').pixels;
-
-               // let indexes = [];
-               // if(rightLine != undefined && leftLine != undefined)
-                //    indexes = takeSpreadIndexes( pixels.length, (rightLine.x1 - leftLine.x1) / 8);
-                
-
+                    indexes = takeSpreadIndexes( pixels.length-1, projectedWidth / 8);
+             
                 let ii = 0;
-
-                for(let i = 0; i < pixels.length; i++) {
-                    if(indexes.includes(i)) { 
-                        const ready = takeSpread(pixels[i], lineH / 8 ); 
-                        for(let j = 0; j < pixels[i].length; j++) {
-                            if(leftLine != undefined && ready[j] != undefined) {
-                                mapGraphic.fillStyle(ready[j].color, ready[j].alpha);
-                                mapGraphic.fillRect(leftLine.x1 + (ii * 8), lineO + (j * 8), 8, 8);
+                for(let i = 0; i < pixels.length; i++) {            
+                    if(indexes.includes(i)) {
+                        const verticalStripeDistance = rayDistances[leftIndex + ii];
+                        if(verticalStripeDistance > s.distance) { 
+                            const ready = takeSpread(pixels[i], lineH / 8 ); 
+                            for(let j = 0; j < pixels[i].length; j++) {
+                                if(leftLine != undefined && ready[j] != undefined) {
+                                    mapGraphic.fillStyle(ready[j].color, ready[j].alpha);
+                                    mapGraphic.fillRect(leftLine.x1 + (ii * 8), lineO + (j * 8), 8, 8);
+                                }
                             }
                         }
                         ii++;
@@ -834,10 +813,28 @@
                     }
             
                 }
-                }, this);
-        }
+        }, this);
+    
+    
+        this.input.on('pointerdown', function (pointer) {
 
-    function update() {
+            console.log('shoot');
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                pdx: player.pdx,
+                pdy: player.pdy,
+                speed: Phaser.Math.GetSpeed(600, 1),
+                rect: new Phaser.Geom.Rectangle(0 ,0, 0, 0),
+            });
+
+        
+
+        }, this);
+    
+    }
+
+    function update(delta) {
       
         movePlayer(this);
         drawRays3D(this);
@@ -878,6 +875,33 @@
         renderSprites(this);
         renderSprites3d(this);
        
+        for(b of bullets) {
+            //console.log(b.speed);
+
+            b.x += b.pdx * 5//b.speed * delta / 1000;
+            b.y += b.pdy * 5//b.speed * delta / 1000;
+
+            b.rect.setTo(b.x, b.y, 10, 10);
+            player.graphics.fillStyle(0x00ff00);
+            player.graphics.fillRectShape(b.rect);
+
+            const distance = dist(player.x, player.y, b.x, b.y);
+
+
+            let lineH = (mapS * 320)/distance;
+            
+            let lineO = /*160 -*/ lineH / 2;
+            
+            if(lineO > 200) {
+                const line = map3d[29].line;
+
+                mapGraphic.fillStyle(0x0000ff);
+                mapGraphic.fillRect(line.x1, lineO, 8, 8);
+            }
+
+
+        }
+
     }
 
     </script>

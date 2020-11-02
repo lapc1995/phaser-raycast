@@ -1,0 +1,26 @@
+{
+  "name": "phaser-raycast",
+  "version": "1.0.0",
+  "description": "A raycast implementation using [Phaser](https://phaser.io/), following this video: [https://www.youtube.com/watch?v=gYRrGTC7GtA](https://www.youtube.com/watch?v=gYRrGTC7GtA)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lapc1995/phaser-raycast.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lapc1995/phaser-raycast/issues"
+  },
+  "homepage": "https://github.com/lapc1995/phaser-raycast#readme",
+  "devDependencies": {
+    "webpack": "^5.3.2",
+    "webpack-cli": "^4.1.0"
+  },
+  "dependencies": {
+    "phaser": "^3.24.1"
+  }
+}
