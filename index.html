@@ -8,6 +8,129 @@
 
     <script>
 
+    class Sprite {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this. maxHP = 100;
+            this. hp = 100;
+            this.xTarget = x;
+            this.yTarget = y;
+            this.moving = false;
+            this.rect = new Phaser.Geom.Rectangle(0, 0, 0, 0);
+            this.distance = 0;
+        }
+
+        update(delta) {
+
+        }
+
+        move(xTarget, yTarget) {
+            this.xTarget = xTarget;
+            this.yTarget = yTarget;
+            this.moving = true;
+        }
+
+        draw2D() {
+            this.rect.setTo(this.x, this.y, 10, 10);
+            player.graphics.fillRectShape(this.rect);
+        }
+
+        draw3D() {
+
+            let visible = false;
+            let index;
+
+            for(let i = 0; i < rayNumber && !visible; i++) {
+
+                if(rayDistances[i] < this.distance) {
+                    continue
+                }
+
+                const relativeHitX = rayHitPoints[i].x - player.x;
+                const relativeHitY = rayHitPoints[i].y - player.y;
+
+                const m = relativeHitY / relativeHitX;
+                
+                // b = y - mx
+                const b = relativeHitY - m * relativeHitX;
+
+                //y = mx + b
+                if(!visible) {
+                    const tempY = (m * (this.x - player.x) + b);
+                    visible = Math.abs( Math.trunc(tempY) - Math.trunc(this.y-player.y)) < 15;
+                    if(visible) {
+
+                        let tr = new Phaser.Geom.Rectangle(this.x, tempY + player.y, 10, 10);
+                        player.graphics.fillStyle(0x0000ff);
+                        player.graphics.fillRectShape(tr);
+
+                        let tl = new Phaser.Geom.Line(0 + player.x, (m * 0 + b) + player.y, this.x, tempY + player.y);
+                        player.graphics.lineStyle(5, 0x0000ff);
+                        player.graphics.strokeLineShape(tl);
+
+                        index = i;
+                    }                         
+                }
+            }
+
+            if(visible) {
+            
+                let lineH = (mapS * 320)/this.distance;
+
+                let lineO = 160 - lineH / 2;
+
+                let pixelInfoSprite = pixelInfo.get('zombie_1');
+
+                const projectedHeight = Math.abs(lineH);
+
+                const spriteAspectRatio = pixelInfoSprite.width/pixelInfoSprite.height;
+
+                const projectedWidth = spriteAspectRatio * projectedHeight;
+
+                const line = map3d[index].line;
+
+                const leftIndex = Math.floor(index - projectedWidth/ 8 /2);
+                const leftLine = map3d[leftIndex] != undefined ? map3d[leftIndex].line : undefined;
+
+                const rightIndex = Math.ceil(index + projectedWidth/ 8 /2);
+                const rightLine = map3d[rightIndex] != undefined ? map3d[rightIndex].line : undefined;
+
+                mapGraphic.fillStyle(0x0000ff);
+                mapGraphic.fillRect(line.x1, lineO, 8, 8);
+                if(leftLine != undefined)
+                    mapGraphic.fillRect(leftLine.x1, lineH + lineO, 8, 8);
+                if(rightLine != undefined)
+                    mapGraphic.fillRect(rightLine.x1, lineH + lineO, 8, 8);
+
+                mapGraphic.fillRect(line.x1, lineH + lineO, 8, 8);
+
+                let pixels = pixelInfoSprite.pixels;
+
+                let indexes = [];
+                if(rightLine != undefined && leftLine != undefined)
+                    indexes = takeSpreadIndexes( pixels.length-1, projectedWidth / 8);
+             
+                let ii = 0;
+                for(let i = 0; i < pixels.length; i++) {            
+                    if(indexes.includes(i)) {
+                        const verticalStripeDistance = rayDistances[leftIndex + ii];
+                        if(verticalStripeDistance > this.distance) { 
+                            const ready = takeSpread(pixels[i], lineH / 8 ); 
+                            for(let j = 0; j < pixels[i].length; j++) {
+                                if(leftLine != undefined && ready[j] != undefined) {
+                                    mapGraphic.fillStyle(ready[j].color, ready[j].alpha);
+                                    mapGraphic.fillRect(leftLine.x1 + (ii * 8), lineO + (j * 8), 8, 8);
+                                }
+                            }
+                        }
+                        ii++;
+                    }
+                }
+            }
+        }
+    }
+
     const config = {
         type: Phaser.AUTO,
         width: 1024,
@@ -26,6 +149,11 @@
     };
 
     const game = new Phaser.Game(config);
+
+
+    let gunAnimationCurrent = 1;
+    let gunAnimation;
+
 
     let player = {
         x: 100,
@@ -76,6 +204,7 @@
     let bullets = [];
 
     function drawPlayer(game) {
+
         player.rect.setTo(player.x, player.y, 10, 10);
         player.graphics.fillRectShape(player.rect);
 
@@ -384,54 +513,17 @@
         mapGraphic.clear();
 
         const test = []
-/*
-        let lastN = 0;
-        let n = 0;
-
-        const sections = {}; 
-
 
         for(let i = 0; i < rayNumber; i++) {
-        
-            let currentN = map3d[i].n;
-
-            console.log( map3d[i]);
-
-            if(currentN != lastN) {
-                lastN = currentN;
-                n = 0;
-                sections[currentN] = 1;
-            } else {
-                sections[currentN] = sections[currentN] + 1
-            }
-
-        }
-      
-        lastN = 0;
-        n = 0;
-        
-*/
-        for(let i = 0; i < rayNumber; i++) {
-            //mapGraphic.strokeLineShape(map3d[i]);
+          
             const line = map3d[i].line;
 
             const rr =  map3d[i].vertical ? map3d[i].ry : map3d[i].rx;
 
             const position =  Math.ceil(rr - (rr >> 6) * mapS) - 1;
                       
-         
-
             var x = line.x1;
             var lineSize = Math.abs(line.y1 - line.y2);
-    
-    /*
-            if(currentN != lastN) {
-                lastN = currentN;
-                n = 0;
-            } 
-*/
-
-            //const indexes = takeSpreadIndexes(64, sections[currentN]);
      
             let pixels;
 
@@ -441,14 +533,9 @@
                 pixels = pixelInfo.get('tile_grass_1').pixels[position];
             }
 
-            //var iv = imageTest.pixels[position];
-         
-        //    n++;
-
             const ready = takeSpread(pixels, lineSize/8); 
 
-        
-        
+            
             let g = 0;
 
             for(let y = line.y1; y < line.y2; y += 8) {
@@ -501,8 +588,6 @@
 
                 for (var y = 0; y < src.height; y++) {
 
-
-
                     canvas.getPixel(x, y, pixel);
 
                     if(pixel.a === 0)
@@ -510,13 +595,6 @@
                     else
                         column.push({color: pixel.color, alpha: pixel.a / 255.0});
 
-                    //if (pixel.a > 0)
-                    //{
-                        //game.add.rectangle(x * 4, y * 8, 4, 8, pixel.color);
-                        //column.push(pixel.color);
-
-
-                    //}
                 }
                 pixelList.push(column);
             }
@@ -526,14 +604,7 @@
         return pixelMap;
         
     }
-    
-    /*
-    def takespread(sequence, num):
-    length = float(len(sequence))
-    for i in range(num):
-        yield sequence[int(ceil(i * length / num))]
-
-*/
+ 
     function takeSpread(sequence,  num) {
         const result = []
 
@@ -559,173 +630,6 @@
         sprites.push({x, y, rect: new Phaser.Geom.Rectangle(0, 0, 0, 0)});
     }
 
-    function renderSprites(game) {
-        for(let s of sprites) {
-            s.rect.setTo(s.x, s.y, 10, 10);
-            player.graphics.fillRectShape(s.rect);
-        }   
-    }
-
-    function renderSprites3d(game) {
-        for(let s of sprites) {
-           s.distance = dist(player.x, player.y, s.x, s.y);
-        }
-
-        sprites.sort((a,b) => b.distance - a.distance);
-
-        for(let s of sprites) {
-
-            let visible = false;
-            let index;
-
-            for(let i = 0; i < rayNumber && !visible; i++) {
-
-                if(rayDistances[i] < s.distance) {
-                    continue
-                }
-
-                const relativeHitX = rayHitPoints[i].x - player.x;
-                const relativeHitY = rayHitPoints[i].y - player.y;
-
-                const m = relativeHitY / relativeHitX;
-                const b = relativeHitY - m * relativeHitX;
-
-                //const m = rayHitPoints[i].y - player.y / rayHitPoints[i].x - player.x;
-                // b = y - mx
-                //const b = rayHitPoints[i].y - m * rayHitPoints[i].x;
-
-                //y = mx + b
-               // const tempY = m * s.x + b;
-                //console.log(tempY, s.y, m, s.x, b)
-                
-                //console.log(rayHitPoints[i].x);
-
-                const corners = [
-                {x: s.x, y: s.y}, 
-                    //                {x: rayHitPoints[i].x, y: rayHitPoints[i].y}, 
-                                 /*   {x: rayHitPoints[i].x + 5, y: rayHitPoints[i].y},
-                                    {x: rayHitPoints[i].x, y: rayHitPoints[i].y + 5},
-                                    {x: rayHitPoints[i].x + 5, y: rayHitPoints[i].y + 5}*/
-                                ] 
-
-/*
-
-                const ss = 20;
-
-                for(let i = 0; i <= ss; i++) {
-                    corners.push({x: rayHitPoints[i].x + i, y: rayHitPoints[i].y}) // up
-                    corners.push({x: rayHitPoints[i].x, y: rayHitPoints[i].y + i}) // left
-                    corners.push({x: rayHitPoints[i].x + i, y: rayHitPoints[i].y + ss}) // down
-                    corners.push({x: rayHitPoints[i].x + ss, y: rayHitPoints[i].y + i}) // right
-                }
-  */              
-
-                //for(let c of corners) {
-                    if(!visible) {
-                        const tempY = (m * (s.x - player.x) + b);
-                        visible = Math.abs( Math.trunc(tempY) - Math.trunc(s.y-player.y)) < 15;
-                        if(visible) {
-
-                            let tr = new Phaser.Geom.Rectangle(s.x, tempY + player.y, 10, 10);
-                            player.graphics.fillStyle(0x0000ff);
-                            player.graphics.fillRectShape(tr);
-
-                            let tl = new Phaser.Geom.Line(0 + player.x, (m * 0 + b) + player.y, s.x, tempY + player.y);
-                            player.graphics.lineStyle(5, 0x0000ff);
-                            player.graphics.strokeLineShape(tl);
-
-                            index = i;
-                        }
-
-                                              
-                    }
-                //}
-
-               // visible = Math.trunc(tempY) === Math.trunc(s.y);
-                
-
-            }
-
-            if(visible) {
-            
-
-                let lineH = (mapS * 320)/s.distance;
-                //if(lineH > 320)
-                //    lineH = 320;
-
-                let lineO = 160 - lineH / 2;
-
-            //i * 8 + 530, lineO,
-            //i * 8 + 530, lineH + lineO, 
-
-
-                let pixelInfoSprite = pixelInfo.get('zombie_1');
-
-                const projectedHeight = Math.abs(lineH);
-
-                const spriteAspectRatio = pixelInfoSprite.width/pixelInfoSprite.height;
-
-                const projectedWidth = spriteAspectRatio * projectedHeight;
-
-                
-                const line = map3d[index].line;
-
-                const leftIndex = Math.floor(index - projectedWidth/ 8 /2);
-                const leftLine = map3d[leftIndex] != undefined ? map3d[leftIndex].line : undefined;
-
-                const rightIndex = Math.ceil(index + projectedWidth/ 8 /2);
-                const rightLine = map3d[rightIndex] != undefined ? map3d[rightIndex].line : undefined;
-
-                mapGraphic.fillStyle(0x0000ff);
-                mapGraphic.fillRect(line.x1, lineO, 8, 8);
-                if(leftLine != undefined)
-                    mapGraphic.fillRect(leftLine.x1, lineH + lineO, 8, 8);
-                if(rightLine != undefined)
-                    mapGraphic.fillRect(rightLine.x1, lineH + lineO, 8, 8);
-
-                mapGraphic.fillRect(line.x1, lineH + lineO, 8, 8);
-
-
-
-                let pixels = pixelInfoSprite.pixels;
-
-                let indexes = [];
-                if(rightLine != undefined && leftLine != undefined)
-                    indexes = takeSpreadIndexes( pixels.length-1, projectedWidth / 8);
-             
-                let ii = 0;
-                for(let i = 0; i < pixels.length; i++) {            
-                    if(indexes.includes(i)) {
-                        const verticalStripeDistance = rayDistances[leftIndex + ii];
-                        if(verticalStripeDistance > s.distance) { 
-                            const ready = takeSpread(pixels[i], lineH / 8 ); 
-                            for(let j = 0; j < pixels[i].length; j++) {
-                                if(leftLine != undefined && ready[j] != undefined) {
-                                    mapGraphic.fillStyle(ready[j].color, ready[j].alpha);
-                                    mapGraphic.fillRect(leftLine.x1 + (ii * 8), lineO + (j * 8), 8, 8);
-                                }
-                            }
-                        }
-                        ii++;
-                    }
-                }
-                    
-                    
-
-                
-
-
-    
-            
-
-
-           }
-
-
-        }
-
-
-    }
 
     function bulletCollision() {
 
@@ -758,7 +662,7 @@
             let index = bullets.indexOf(tb);
             bullets.splice(index, 1);  
         }
-       
+
 
     }
 
@@ -785,6 +689,11 @@
         this.load.image('wall', 'assets/sprites/pattern112.png');
         this.load.image('zombie_1', 'assets/sprites/zombie_1.png');
         this.load.image('zombie_1_big', 'assets/sprites/zombie_1_big.png');
+        this.load.image('gun', 'assets/sprites/gun.png');
+        this.load.image('gun2', 'assets/sprites/gun2.png');
+        this.load.image('gun3', 'assets/sprites/gun3.png');
+        this.load.image('gun4', 'assets/sprites/gun4.png');
+        this.load.image('gun5', 'assets/sprites/gun5.png');
     }
 
     let pixelInfo;
@@ -810,11 +719,19 @@
         player.directionGraphics = this.add.graphics({ lineStyle: { width: 3, color: 0xaa00aa } });
         drawPlayer(this, 100, 100);
 
-        pixelInfo = loadPixelInfo(game, ['wall', 'tile_grass_1', 'zombie_1', 'zombie_1_big']);
+        pixelInfo = loadPixelInfo(game, ['wall', 'tile_grass_1', 'zombie_1', 'zombie_1_big', 'gun', 'gun2', 'gun3', 'gun4', 'gun5']);
 
-        addSprite(this, 300, 200);
-        addSprite(this, 200, 200);
-        addSprite(this, 300, 300);
+        gunAnimation = {
+            1:  pixelInfo.get('gun').pixels,
+            2:  pixelInfo.get('gun2').pixels,
+            3:  pixelInfo.get('gun3').pixels,
+            4:  pixelInfo.get('gun4').pixels,
+            5:  pixelInfo.get('gun5').pixels,
+        }
+
+        sprites.push(new Sprite(300, 200));
+        sprites.push(new Sprite(200, 200));
+        sprites.push(new Sprite(300, 300));
 
         this.input.on('pointerdown', function (pointer) {
             this.input.mouse.requestPointerLock();
@@ -861,10 +778,26 @@
                 rect: new Phaser.Geom.Rectangle(0 ,0, 0, 0),
             });
 
-        
+            gunAnimationCurrent = 2;
 
         }, this);
     
+    }
+
+    function updateSprites(delta) {
+
+        for(let s of sprites) {
+           s.distance = dist(player.x, player.y, s.x, s.y);
+        }
+
+        sprites.sort((a,b) => b.distance - a.distance);
+
+        for(let s of sprites) {
+            s.update(delta);
+            s.draw2D();
+            s.draw3D();
+        }
+
     }
 
     function update(delta) {
@@ -905,14 +838,13 @@
         }
 */
 
-        renderSprites(this);
-        renderSprites3d(this);
-       
-        for(b of bullets) {
-            //console.log(b.speed);
 
-            b.x += b.pdx * 5//b.speed * delta / 1000;
-            b.y += b.pdy * 5//b.speed * delta / 1000;
+        updateSprites(delta);
+
+        for(b of bullets) {
+
+            b.x += b.pdx * 5;
+            b.y += b.pdy * 5;
 
             b.rect.setTo(b.x, b.y, 10, 10);
             player.graphics.fillStyle(0x00ff00);
@@ -923,7 +855,7 @@
 
             let lineH = (mapS * 320)/distance;
             
-            let lineO = /*160 -*/ lineH / 2;
+            let lineO = lineH / 2;
             
             if(lineO > 200) {
                 const line = map3d[29].line;
@@ -936,6 +868,25 @@
         }
 
         bulletCollision();
+
+        console.log(gunAnimationCurrent);
+
+        if(gunAnimationCurrent > 1 && gunAnimationCurrent < 5) {
+            gunAnimationCurrent++;
+        } else if (gunAnimationCurrent > 5) {
+            gunAnimationCurrent = 1;
+        }
+
+        const gunPixels = gunAnimation[gunAnimationCurrent] //pixelInfo.get('gun').pixels;
+        for(let i = 0; i < gunPixels.length; i++) {            
+            for(let j = 0; j < gunPixels[i].length; j++) {
+                mapGraphic.fillStyle(gunPixels[i][j].color, gunPixels[i][j].alpha);
+                mapGraphic.fillRect(530 - 30 + (i * 8), (j * 8), 8, 8);
+            }
+        }
+
+
+                    
 
     }
 
