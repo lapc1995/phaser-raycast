@@ -73,7 +73,7 @@
     const rayDistances = new Array(rayNumber);
     const rayHitPoints = new Array(rayNumber);
 
-    const bullets = [];
+    let bullets = [];
 
     function drawPlayer(game) {
         player.rect.setTo(player.x, player.y, 10, 10);
@@ -101,7 +101,6 @@
     function movePlayer(game) {
 
         if (Phaser.Input.Keyboard.JustDown(keySpacebar)) {
-            console.log('shoot');
             bullets.push({
                 x: player.x,
                 y: player.y,
@@ -728,6 +727,41 @@
 
     }
 
+    function bulletCollision() {
+
+
+        const toBeRemoved = [];
+
+        for(let b of bullets) {
+            
+            //check walls
+            const mx = ((Math.trunc(b.x + 5) >> 6) );
+            const my = ((Math.trunc(b.y + 5) >> 6) );
+            const mp = my * mapX + mx;
+
+            if(map[mp] != 0) {
+                toBeRemoved.push(b);  
+            } else {
+                // check sprites
+                for(let s of sprites) {
+                    //console.log(Math.abs(b.x - s.x),Math.abs(b.y - s.y))
+                    if(Math.abs(b.x - s.x) < 30 && Math.abs(b.y - s.y) < 30) {
+                        console.log('hit');
+                        toBeRemoved.push(b);
+                    }
+                }
+            }
+
+        }
+
+        for(let tb of toBeRemoved) {
+            let index = bullets.indexOf(tb);
+            bullets.splice(index, 1);  
+        }
+       
+
+    }
+
     function preload () {
 
 /*
@@ -779,8 +813,8 @@
         pixelInfo = loadPixelInfo(game, ['wall', 'tile_grass_1', 'zombie_1', 'zombie_1_big']);
 
         addSprite(this, 300, 200);
-        //addSprite(this, 200, 200);
-        //addSprite(this, 300, 300);
+        addSprite(this, 200, 200);
+        addSprite(this, 300, 300);
 
         this.input.on('pointerdown', function (pointer) {
             this.input.mouse.requestPointerLock();
@@ -818,7 +852,6 @@
     
         this.input.on('pointerdown', function (pointer) {
 
-            console.log('shoot');
             bullets.push({
                 x: player.x,
                 y: player.y,
@@ -901,6 +934,8 @@
 
 
         }
+
+        bulletCollision();
 
     }
 
